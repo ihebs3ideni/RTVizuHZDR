@@ -1,0 +1,308 @@
+{ "correct":{
+    "Status": {"code": 404,
+               "message" : "NOT FOUND" },
+     "Body": {
+       "data": {
+         "timesteps": [
+           0,
+           1,
+           2,
+           3,
+           4
+         ],
+        "dataSize": 5,
+       "channels": {
+         "channel_1": {
+           "real": [
+             1,
+             2,
+             3,
+             4,
+             5
+           ],
+           "imag": [
+             1,
+             2,
+             3,
+             4,
+             5
+           ]
+         },
+         "channel_2": {
+           "real": [
+             2,
+             3,
+             4,
+             5,
+             6
+           ],
+           "imag": [
+             1,
+             2,
+             3,
+             4,
+             5
+           ]
+         },
+         "channel_3": {
+           "real": [
+             3,
+             4,
+             5,
+             6,
+             7
+           ],
+           "imag": [
+             1,
+             2,
+             3,
+             4,
+             5
+           ]
+         }
+       }
+       },
+       "metaData": {
+         "comment": "wrongDatasize",
+         "dataNature": "manually generated data"
+       }
+     }
+
+    },
+  "wrongDatasize":{
+    "Status": {"code": 404,
+               "message" : "NOT FOUND" },
+     "Body": {
+       "data": {
+         "timesteps": [
+           0,
+           1,
+           2,
+           3,
+           4
+         ],
+        "dataSize": 1,
+       "channels": {
+         "channel_1": {
+           "real": [
+             1,
+             2,
+             3,
+             4,
+             5
+           ],
+           "imag": [
+             1,
+             2,
+             3,
+             4,
+             5
+           ]
+         },
+         "channel_2": {
+           "real": [
+             2,
+             3,
+             4,
+             5,
+             6
+           ],
+           "imag": [
+             1,
+             2,
+             3,
+             4,
+             5
+           ]
+         },
+         "channel_3": {
+           "real": [
+             3,
+             4,
+             5,
+             6,
+             7
+           ],
+           "imag": [
+             1,
+             2,
+             3,
+             4,
+             5
+           ]
+         }
+       }
+       },
+       "metaData": {
+         "comment": "wrongDatasize",
+         "dataNature": "manually generated data"
+       }
+     }
+
+    },
+"UnorderedTimeSerie": {
+    "Status": {"code": 404,
+               "message" : "NOT FOUND" },
+     "Body": {
+       "data": {
+         "timesteps": [
+           0,
+           1,
+           9,
+           3,
+           4
+         ],
+        "dataSize": 5,
+       "channels": {
+         "channel_1": {
+           "real": [
+             1,
+             2,
+             3,
+             4,
+             5
+           ],
+           "imag": [
+             1,
+             2,
+             3,
+             4,
+             5
+           ]
+         },
+         "channel_2": {
+           "real": [
+             2,
+             3,
+             4,
+             5,
+             6
+           ],
+           "imag": [
+             1,
+             2,
+             3,
+             4,
+             5
+           ]
+         },
+         "channel_3": {
+           "real": [
+             3,
+             4,
+             5,
+             6,
+             7
+           ],
+           "imag": [
+             1,
+             2,
+             3,
+             4,
+             5
+           ]
+         }
+       }
+       },
+       "metaData": {
+         "comment": "UnorderedTimeSerie",
+         "dataNature": "manually generated data"
+       }
+     }
+
+},
+"MissingElementInOneArray": {
+    "Status": {"code": 404,
+               "message" : "NOT FOUND" },
+     "Body": {
+       "data": {
+         "timesteps": [
+           0,
+           1,
+           2,
+           3,
+           4
+         ],
+        "dataSize": 5,
+       "channels": {
+         "channel_1": {
+           "real": [
+             1,
+
+             3,
+             4,
+             5
+           ],
+           "imag": [
+             1,
+             2,
+             3,
+             4,
+             5
+           ]
+         },
+         "channel_2": {
+           "real": [
+             2,
+             3,
+             4,
+             5,
+             6
+           ],
+           "imag": [
+             1,
+             2,
+             3,
+             4,
+             5
+           ]
+         },
+         "channel_3": {
+           "real": [
+             3,
+             4,
+             5,
+             6,
+             7
+           ],
+           "imag": [
+             1,
+             2,
+             3,
+             4,
+             5
+           ]
+         }
+       }
+       },
+       "metaData": {
+         "comment": "MissingElementInOneArray",
+         "dataNature": "manually generated data"
+       }
+     }
+
+},
+  "noChannelData": {
+    "Status": {"code": 404,
+               "message" : "NOT FOUND" },
+     "Body": {
+       "data": {
+         "timesteps": [
+           0,
+           1,
+           2,
+           3,
+           4
+         ],
+        "dataSize": 5,
+       "channels": {
+       }
+       },
+       "metaData": {
+         "comment": "noChannelData",
+         "dataNature": "manually generated data"
+       }
+     }
+
+}
+}

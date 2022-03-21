@@ -1,0 +1,10 @@
+matplotlib==3.4.3
+mayavi==4.7.1
+numpy==1.21.2
+pydantic==1.8.2
+PyQt5==5.15.6
+pyqtgraph==0.11.0
+scipy==1.7.1
+tqdm==4.62.3
+traits==6.1.1
+traitsui==7.1.0
