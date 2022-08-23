@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QPushButton, QChe
 
 IconPath = r"D:\HZDR\HZDR_VISU_TOOL\Package\Icons\hzdr_logo.png"
 
+
 class IconObject(QWidget):
     def __init__(self, text, image_path, size: Tuple = (64, 64)):
         super().__init__()
@@ -30,7 +31,10 @@ class IconObject(QWidget):
 
 
 class BaseControlPanel(QMainWindow):
-    def __init__(self, title="Base Control Panel", size=(600,300)):
+    """THIS CLASSES WORKS EITHER AS A FACTORY THAT DOESN'T TRACK THE OBJECTS IT CREATES OR AS A DATA BASE IF A UID
+    IS PROVICED AT THE CREATION OF THE OBJECT"""
+
+    def __init__(self, title="Base Control Panel", size=(600, 300)):
         super().__init__()
         self.setWindowTitle(title)
         self.resize(*size)
@@ -40,7 +44,7 @@ class BaseControlPanel(QMainWindow):
         self.setCentralWidget(self.mainWidget)
         self.mainWidget.setLayout(self.mainLayout)
 
-        self.close_callbacks: List[Callable] = None #callback to be executed when closing the panel
+        self.close_callbacks: List[Callable] = None  # callback to be executed when closing the panel
         self.push_buttons: Dict[str, QPushButton] = dict()
         self.checkboxes: Dict[str, QCheckBox] = dict()
         self.icons: Dict[str, IconObject] = dict()
@@ -63,7 +67,8 @@ class BaseControlPanel(QMainWindow):
             self.close_callbacks = []
         self.close_callbacks.append(callback)
 
-    def add_push_button(self, text: str, coordinates: Tuple, callback: Callable = None, UID=None, **kwargs) -> QPushButton:
+    def add_push_button(self, text: str, coordinates: Tuple, callback: Callable = None, UID=None,
+                        **kwargs) -> QPushButton:
         """!!! UID needs to be non None if the 'self.push_buttons' dictionary is used to track the buttons!!!"""
         b = QPushButton(self, text=text)
         if callback:
@@ -83,7 +88,8 @@ class BaseControlPanel(QMainWindow):
             self.checkboxes[UID] = cb
         return cb
 
-    def add_Icon(self, text, image_path, coordinates: Tuple, callback: Callable = None, UID = None, **kwargs) -> IconObject:
+    def add_Icon(self, text, image_path, coordinates: Tuple, callback: Callable = None, UID=None,
+                 **kwargs) -> IconObject:
         """!!! UID needs to be non None if the 'self.icons' dictionary is used to track the icons!!!"""
         icon = IconObject(text=text, image_path=image_path)
         if callback:
@@ -95,7 +101,6 @@ class BaseControlPanel(QMainWindow):
 
 
 def main():
-
     cp = BaseControlPanel("this is a test")
     # io = IconObject("this is a test", )
     # io.show()
@@ -113,7 +118,6 @@ def main():
                              lambda event: print(f"this is a callback test: {event.globalPos(), event.pos()}"))
 
     return cp
-
 
 
 if __name__ == '__main__':

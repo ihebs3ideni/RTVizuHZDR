@@ -117,25 +117,29 @@ class QTLineGraph(QTBasedGraph):
             self.dynamic_canvas.showGrid(x=True, y=True)
         self.autoscale_signal.connect(self.autoscale_trigger)
 
-    def onUpdatePlot(self, data: LineGraphData):
+    def onUpdatePlot(self, dataStruct: LineGraphData):
         try:
-            xs, ys = data.x_Data, data.y_Data
-            values = list(ys.values())
-            min_y, max_y = np.nanmin(values[0].data), np.nanmax(values[0].data)
-            min_x, max_x = np.nanmin(xs.data), np.nanmax(xs.data)
+
+            values = list(dataStruct.Data.values())
+            min_x, max_x = np.nanmin(values[0][0].data), np.nanmax(values[0][0].data)
+            min_y, max_y = np.nanmin(values[0][1].data), np.nanmax(values[0][1].data)
+
             for id_, e in self.structure.elements.items():
                 sid = e.sensorID
-                y_data = ys.get(sid).data
+                y_data = dataStruct.Data.get(sid)[1].data
+                x_data = dataStruct.Data.get(sid)[0].data
                 if y_data is not None:
+                    min_x = np.minimum(min_x, np.nanmin(x_data))
+                    max_x = np.maximum(max_x, np.nanmin(x_data))
                     min_y = np.minimum(min_y, np.nanmin(y_data))
                     max_y = np.maximum(max_y, np.nanmax(y_data))
-                self.lines[id_].setData(xs.data, y_data)
+                    self.lines[id_].setData(x_data, y_data)
 
-            if self.autoscale_flag:
-                    dy = (max_y - min_y) * 0.1
-                    self.set_y_lim(min_y - dy, max_y + dy)
-            dx = (max_x - min_x) * 0.1
-            self.set_x_lim(min_x - dx, max_x +dx)
+            # if self.autoscale_flag:
+            #         dy = (max_y - min_y) * 0.1
+            #         self.set_y_lim(min_y - dy, max_y + dy)
+            # dx = (max_x - min_x) * 0.1
+            # self.set_x_lim(min_x - dx, max_x +dx)
 
         except Exception as e:
             print(e)
@@ -169,19 +173,19 @@ class QTLevelGraph(QTBasedGraph):
         super().__init__(structure, spawning_position)
         self.create_canvas()
         self.lines = dict(
-            (id_, self._dynamic_ax.plot(e.X, e.Y, pen=pg.mkPen(line_color, width=2)))
+            (id_, self._dynamic_ax.plot(e.X_init, e.Y_init, pen=pg.mkPen(line_color, width=2)))
             for id_, e in self.structure.elements.items())
-        self.ScatterGroups = dict((id_, self._dynamic_ax.scatterPlot(e.X, e.Y, pen=pg.mkPen(e.color, width=2),
+        self.ScatterGroups = dict((id_, self._dynamic_ax.scatterPlot(e.X_init, e.Y_init, pen=pg.mkPen(e.color, width=2),
                                                                      name=e.label, brush=pg.mkBrush(e.color)))
                                   for id_, e in self.structure.elements.items())
 
         if self.structure.grid:
             self.dynamic_canvas.showGrid(x=True, y=True)
 
-    def onUpdatePlot(self, data: LevelGraphData):
+    def onUpdatePlot(self, dataStruct: LevelGraphData):
         try:
 
-            xs, ys = data.x_Data, data.y_Data
+            xs, ys = dataStruct.x_Data, dataStruct.y_Data
             for id_, x in xs.items():
                 self.ScatterGroups[id_].setData(x, ys[id_])
                 self.lines[id_].setData(x, ys[id_])

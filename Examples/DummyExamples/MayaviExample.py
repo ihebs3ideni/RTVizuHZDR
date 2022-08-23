@@ -43,8 +43,9 @@ def VectorGraph(factory, spawning_pos: int, c=""):
 
     x, y, z = np.mgrid[-10:10, -10:10, -4:4]  # create grid
     structure = GraphStructure(ID=f"Test Mayavi Dynamic graph {c}", blit=True, grid=True, yLim=(1, -1),
-                               elements=dict(g1=ElementStructure(X=x, Y=y, Z=z, hasGrid=True, hasStreamLines=True,
-                                                                 hasVectorField=True, hasCutPlane=True,
+                               elements=dict(g1=ElementStructure(X_init=x, Y_init=y, Z_init=z, hasGrid=True,
+                                                                 hasStreamLines=True, hasVectorField=True,
+                                                                 hasCutPlane=True,
                                                                  )))
     g = factory.get_VectorGraph(structure, spawning_pos)
     g.add_postProcess(filter_)

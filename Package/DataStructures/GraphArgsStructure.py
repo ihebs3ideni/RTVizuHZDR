@@ -25,17 +25,21 @@ class ColorNotSupportedException(GraphConfigStructureException):
     """High level exception raised when the color specified is not supported"""
     pass
 
+
 class ColorNotProvidedException(GraphConfigStructureException):
     """High level exception raised when the color is not specified"""
     pass
+
 
 class LabelNotProvidedException(GraphConfigStructureException):
     """High level exception raised when the label is not specified"""
     pass
 
+
 class DuplicatedSensorIdException(GraphConfigStructureException):
     """High level exception raised when two graph elements are responsible for the same sensor"""
     pass
+
 
 class QuiverDensityOutOfRange(GraphConfigStructureException):
     """High level exception raised when the density provided for the quiver Graph is out of range"""
@@ -54,11 +58,12 @@ class ElementStructure(BaseModel):
     scale: Optional[float] = 3
     units: Optional[str] = 'xy'
     density: Optional[float] = 0.5
-    X: Optional[ndarray] #S/Q
-    Y: Optional[ndarray] #S/Q
-    Z: Optional[ndarray] #S/Q
+    X_init: Optional[ndarray]  # S/Q
+    Y_init: Optional[ndarray]  # S/Q
+    Z_init: Optional[ndarray]  # S/Q
+    sensorIDs: Optional[List[int]]
     """For line Graphs"""
-    sensorID: Optional[str]
+    sensorID: Optional[int]
     """for mayavi Graphs"""
     hasVectorField: Optional[bool] = False
     hasGrid: Optional[bool] = False
@@ -70,15 +75,13 @@ class ElementStructure(BaseModel):
 
     @validator("density")
     def check_density(cls, density):
-        if density in [0,1]:
+        if density in [0, 1]:
             return density
         raise QuiverDensityOutOfRange(error=density, message="The provided Density needs to be in [0,1]")
 
     # @root_validator()
     # def check_Quiver(cls, attributes):
     #     return attributes
-
-
 
     # @root_validator(pre=True)
     # def check_args(cls, attributes):
@@ -101,6 +104,8 @@ class ElementStructure(BaseModel):
     #                 SUPPORTED_COLORS))
     #     return color or "r"
     #
+
+
 #     @validator("label")
 #     @classmethod
 #     def label_provided(cls, label):
@@ -118,15 +123,17 @@ class GraphStructure(BaseModel):
     xLim: Optional[Tuple[float, float]]
     yLim: Optional[Tuple[float, float]]
     grid: Optional[bool]
+
     # updateIntervalMs: Optional[int]  # only needed when using the built in timer to drive the plot update
-    blit: Optional[bool] #a flag to control wheather the graph uses blitting or not (only needed for Matplotlib based graphs)
-    ID: Optional[str] = "" #an optional ID to keep track of graphs from within
-    colorMap: Optional[str] = "jet" #relevant for quivers
+    blit: Optional[
+        bool]  # a flag to control wheather the graph uses blitting or not (only needed for Matplotlib based graphs)
+    ID: Optional[str] = ""  # an optional ID to keep track of graphs from within
+    colorMap: Optional[str] = "jet"  # relevant for quivers
+    with_lines: Optional[bool] = True  # relevant for level plots
 
     # relevant for postprocessing before plotting to avoid blocking the eventloop.
     # !!! IN CASE NEEDED USE FOR ALL WINDOWS BECAUSE THEY SHARE THE SAME EVENTLOOP
     asynchronous: Optional[bool] = False
-
 
     @validator("blit")
     def checkBlit(cls, blit):
@@ -160,9 +167,7 @@ class GraphStructure(BaseModel):
     #             raise DuplicatedSensorIdException(ids, message="Some IDs are duplicated")
     #     return attributes
 
-
-
-    def get_SensorIds(self) -> List[str]:
+    def get_SensorIds(self) -> List[int]:
         return [e.sensorID for _, e in self.elements.items()]
 
 

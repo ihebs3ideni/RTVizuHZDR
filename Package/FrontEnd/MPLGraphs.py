@@ -67,17 +67,14 @@ class MPLBasedGraph(BaseGraphCanvas):
         self.zoom_handler.zoom_factory(self._dynamic_ax, base_scale=scale)
         self.zoom_handler.pan_factory(self._dynamic_ax)
 
-    def set_x_lim(self, downtLim, upLim):
-        try:
-            self._dynamic_ax.set_xlim(downtLim, upLim)
-        except Exception as e:
-            print(e)
+    def set_x_lim(self, left_lim, right_lim):
+        if left_lim != right_lim:
+            self._dynamic_ax.set_xlim(left_lim, right_lim)
 
     def set_y_lim(self, downtLim, upLim):
-        try:
+        if downtLim != upLim:
             self._dynamic_ax.set_ylim(downtLim, upLim)
-        except Exception as e:
-            print(e)
+
 
     def add_vLine(self, coordinates: List[float], ymin: List[float], ymax: List[float], **kwargs):
         """kwargs:  -colors : array_like of colors, optional, default: 'k'
@@ -212,25 +209,29 @@ class MPLLineGraph(MPLBasedGraph):
 
     def onUpdatePlot(self, data: LineGraphData):
         try:
-            xs, ys = data.x_Data, data.y_Data
-            values = list(ys.values())
-            min_y, max_y = np.nanmin(values[0].data), np.nanmax(values[0].data)
-            min_x, max_x = np.nanmin(xs.data), np.nanmax(xs.data)
+            # xs, ys = data.x_Data, data.y_Data
+            values = list(data.Data.values())
+            min_x, max_x = np.nanmin(values[0][0].data), np.nanmax(values[0][0].data)
+            min_y, max_y = np.nanmin(values[0][1].data), np.nanmax(values[0][1].data)
+
             for id_, e in self.structure.elements.items():
                 if self.lines[id_].get_visible():
                     sid = e.sensorID
-                    y_data = ys.get(sid).data
+                    y_data = data.Data.get(sid)[1].data
+                    x_data = data.Data.get(sid)[0].data
                     if y_data is not None:
+                        min_x = np.minimum(min_x, np.nanmin(x_data))
+                        max_x = np.maximum(max_x, np.nanmin(x_data))
                         min_y = np.minimum(min_y, np.nanmin(y_data))
                         max_y = np.maximum(max_y, np.nanmax(y_data))
-                        self.lines[id_].set_xdata(xs.data)
+                        self.lines[id_].set_xdata(x_data)
                         self.lines[id_].set_ydata(y_data)
-
-            if self.autoscale_flag:
-                dy = (max_y - min_y) * 0.1
-                self.set_y_lim(min_y - dy, max_y + dy)
-            dx = (max_x - min_x) * 0.1
-            self.set_x_lim(min_x - dx, max_x + dx)
+            if min_x != np.inf:
+                if self.autoscale_flag:
+                    dy = (max_y - min_y) * 0.1
+                    self.set_y_lim(min_y - dy, max_y + dy)
+                dx = (max_x - min_x) * 0.1
+                self.set_x_lim(min_x - dx, max_x + dx)
 
             if self.blit:
                 self.BM.update()
@@ -271,8 +272,12 @@ class MPLLevelGraph(MPLBasedGraph):
     def __init__(self, structure: GraphStructure, spawning_position: int = None):
         super().__init__(structure, spawning_position)
         self.create_canvas()
-        self.lines = dict((id_, self._dynamic_ax.plot(e.X, e.Y, "-o", animated=self.blit)[0],) for id_, e in
-                          self.structure.elements.items())
+        if self.structure.with_lines:
+            self.lines = dict((id_, self._dynamic_ax.plot(e.X_init, e.Y_init, "-o", animated=self.blit)[0],) for id_, e in
+                              self.structure.elements.items())
+        else:
+            self.lines = dict((id_, self._dynamic_ax.plot(e.X_init, e.Y_init, "o", animated=self.blit)[0],) for id_, e in
+                              self.structure.elements.items())
         if self.blit:
             arg = list(self.lines.values())
             self.BM = BlitManager(self.dynamic_canvas, arg)
@@ -374,7 +379,7 @@ class MPLVectorGraph(MPLBasedGraph):
 
         """no need for keys because we made sure elements can only contain one element"""
         e = list(self.structure.elements.values())[0]
-        self.arrows = self._dynamic_ax.quiver(e.X, e.Y, np.zeros(e.X.shape), np.zeros(e.X.shape),
+        self.arrows = self._dynamic_ax.quiver(e.X_init, e.Y_init, np.zeros(e.X_init.shape), np.zeros(e.X_init.shape),
                                               cmap=get_cmap(self.structure.colorMap), color=e.color,
                                               zorder=e.zorder, scale=e.scale, units=e.units, animated=self.blit)
 

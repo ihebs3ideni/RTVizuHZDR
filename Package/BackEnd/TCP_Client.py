@@ -46,6 +46,7 @@ class BaseTcpClient(ABC):
     error_callback: Callable = lambda **kwargs: exec(
         'raise ClientBaseException(error=None,message=traceback.format_exc())')
     readBufferSize: int = 10 * 1024 ** 2
+    is_free: bool = True
 
     def __enter__(self):
         # ttysetattr etc goes here before opening and returning the file object
@@ -177,21 +178,22 @@ class AsyncTCP_Client(BaseTcpClient, asyncore.dispatcher):
             raise EventloopException(error=e, message="Asyncore Event Loop could't be started")
 
 
-from PyQt5.QtCore import QByteArray, QDataStream, QIODevice
+from PyQt5.QtCore import QByteArray, QDataStream, QIODevice, pyqtSignal
 from PyQt5.QtNetwork import QHostAddress, QTcpSocket, QAbstractSocket
 
 
 class QT_TCPClient(BaseTcpClient):
     """Client class based on the QT event system and adhering the the interface set in BaseTcpClient.
         This class needs to e instantiated inside a QApplication event loop """
-
     def __init__(self, host: str, port: int):
         self.host, self.port = host, port
         self.socket = QTcpSocket()
+        self.fragments = []
         self.socket.connected.connect(self.handle_connect)
         self.socket.disconnected.connect(self.handle_close)
         self.socket.error.connect(self.handle_error)
         self.socket.readyRead.connect(self.handle_read)
+        # self.msg_received.connect(self.receive_callback)
 
     def handle_connect(self):
         self.connection_callback()
@@ -202,7 +204,12 @@ class QT_TCPClient(BaseTcpClient):
     #
     def handle_read(self):
         raw_data = self.socket.readAll()
-        self.receive_callback(raw_data)
+        self.fragments.append(raw_data)
+        if raw_data.endsWith(b'\n'):
+            self.receive_callback(b''.join(self.fragments))
+            self.fragments.clear()
+
+
 
     #
     def on_error(self, callback: Callable):
@@ -235,12 +242,16 @@ class QT_TCPClient(BaseTcpClient):
         except OSError:
             raise MakingConnectionException(self.socket, "Connection to the server couldn't be established")
 
+
+
     def close_connection(self):
         if self.isConnected():
             self.socket.close()
 
     def write(self, data: str):
+        self.is_free = False
         self.socket.write(bytes(data, "ascii"))
+        self.is_free = True
 
     def get_raw_socket(self):
         return self.socket

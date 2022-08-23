@@ -1,0 +1,408 @@
+from Package.FrontEnd.CustomizableControlPanel import BaseControlPanel
+from Package.FrontEnd.factories import MPLFactory, QTFactory, BaseFactory
+from Package.FrontEnd.BaseInterface import BaseGraphCanvas
+from Package.DataStructures.GraphArgsStructure import GraphStructure, ElementStructure
+from Package.DataStructures.requestBody import Request, InitResponse
+from Package.BackEnd.TCP_Client import BaseTcpClient, QT_TCPClient
+import numpy as np
+
+from PyQt5.QtCore import QTimer
+
+import json
+from typing import List, Tuple, Any, Optional, Dict
+from dataclasses import dataclass
+from enum import Enum
+from Package.HelperTools.json_check import is_json
+from Package.HelperTools.RequestParser import RequestParser, LineGraphParser, LevelGraphParser, VectorGraphParser
+from queue import Queue
+
+INIT_CMD = "*IDN?"
+GET_CMD = ":DATA?"
+BYE_CMD = "end."
+
+
+@dataclass
+class graphConfig:
+    structure: GraphStructure
+    factory: BaseFactory
+    spawning_position: int
+    x_axis_id: str = "timestamp"
+    y_axis_id: str = "real"
+    z_axis_id: Optional[str] = None
+    history: Optional[int] = 5000
+
+
+@dataclass
+class AppConfig:
+    LevelGraphs: List[graphConfig] = None  # dict(graphs: [GraphStructure,..], factory: BaseFactory, spawning_position)
+    LineGraphs: List[graphConfig] = None  # dict(graphs: [GraphStructure,..], factory: BaseFactory...)
+    VectorGraphs: List[graphConfig] = None  # dict(graphs: [GraphStructure,..], factory: BaseFactory...)
+
+
+@dataclass
+class GENERICApp:
+    refresh_rate: int
+    groups: List[range]  # TODO:remove
+    host: str
+    port: int
+    slice_size: int
+    request_processed: bool
+    reference_ids: Optional[List[int]] = None  # only when request_processed = true
+    level_graph_list: List[BaseGraphCanvas] = None
+    level_graph_parsers: List[LevelGraphParser] = None
+    vector_graph_list: List[BaseGraphCanvas] = None
+    vector_graph_parsers: List[VectorGraphParser] = None
+    line_graphs_list: List[BaseGraphCanvas] = None
+    line_graph_parsers: List[LineGraphParser] = None
+    client: BaseTcpClient = None
+    sample_size: int = None
+    request_timer: QTimer = QTimer()
+    init_timer: QTimer = QTimer()
+    controlPanel: BaseControlPanel = None
+    current_cmd = INIT_CMD
+    cmds_queue: Queue = Queue()
+    data_type: str = "-raw"
+    max_sample_request = 1
+
+    def create_from_config(self, config: AppConfig):
+        # create_line graphs and their parsers
+        if config.LineGraphs:
+            self.line_graphs_list = []  # overwrite class member
+            self.line_graph_parsers = []
+            for line_graph_config in config.LineGraphs:
+                if self.max_sample_request < line_graph_config.history:
+                    self.max_sample_request = line_graph_config.history
+                factory = line_graph_config.factory
+                if factory is None:
+                    factory = QTFactory()
+                struct = line_graph_config.structure
+                self.line_graphs_list.append(
+                    factory.get_LineGraph(struct, spawning_position=line_graph_config.spawning_position))
+                self.line_graph_parsers.append(LineGraphParser(graph_structure=struct, factory_=factory,
+                                                               Buffer_size_=line_graph_config.history,
+                                                               x_axis_id=line_graph_config.x_axis_id,
+                                                               y_axis_id=line_graph_config.y_axis_id,
+                                                               slice_size_=self.slice_size))
+            self.line_graphs_list[-1].autoscale_flag = False
+        if config.LevelGraphs:
+            self.level_graph_list = []
+            self.level_graph_parsers = []
+            for lvl_graph_config in config.LevelGraphs:
+                factory = lvl_graph_config.factory
+                if factory is None:
+                    factory = QTFactory()
+                struct = lvl_graph_config.structure
+                self.level_graph_list.append(
+                    factory.get_LevelGraph(struct, spawning_position=lvl_graph_config.spawning_position))
+                self.level_graph_parsers.append(
+                    LevelGraphParser(graph_structure=struct, factory_=factory, x_axis_id=lvl_graph_config.x_axis_id,
+                                     y_axis_id=lvl_graph_config.y_axis_id))
+            self.level_graph_list[-1].autoscale_flag = False
+
+        if config.VectorGraphs:
+            self.vector_graph_list = []
+            self.vector_graph_parsers = []
+            for vector_graph_config in config.VectorGraphs:
+                factory = vector_graph_config.factory
+                if factory is None:
+                    factory = MPLFactory()
+                struct = vector_graph_config.structure
+                self.vector_graph_list.append(
+                    factory.get_VectorGraph(struct, spawning_position=vector_graph_config.spawning_position))
+                self.vector_graph_parsers.append(
+                    VectorGraphParser(graph_structure=struct, factory_=factory, x_axis_id=vector_graph_config.x_axis_id,
+                                      y_axis_id=vector_graph_config.y_axis_id, z_axis_id=vector_graph_config.z_axis_id))
+            self.vector_graph_list[-1].autoscale_flag = False
+
+    def connect_cb(self, *args):
+        if self.request_processed:
+            if self.reference_ids is None:
+                print("REFERENCE ID NEEDS TO BE PROVIDED AT INITIALISATION IF PROCESSED DATA IS REQUESTED\n")
+                return
+            self.data_type = "-p " + "".join([str(ref_id) for ref_id in self.reference_ids])
+        else:
+            self.data_type = "-raw"
+        icon = self.controlPanel.icons.get("CONNECTION_STATUS")
+        # print(self.controlPanel.icons)
+        if icon is None:
+            print("No Icon to update")
+            return
+        icon.update_Icon(r"D:\HZDR\HZDR_VISU_TOOL\Examples\PegelApp\connected.png")
+
+    def disconnect_cb(self, *arg):
+        icon = self.controlPanel.icons.get("CONNECTION_STATUS")
+        if icon is None:
+            print("No Icon to update")
+            return
+        icon.update_Icon(r"D:\HZDR\HZDR_VISU_TOOL\Examples\PegelApp\no_connection.png")
+
+    def error_cb(self, *args):
+        for e in args:
+            print(f"Client Error: - {e}")
+
+    def create_client(self):
+        if self.client is None:
+            self.client = QT_TCPClient(self.host, self.port)
+            self.client.on_receive(self.received_callback)
+            self.client.on_connect(self.connect_cb)
+            self.client.on_disconnect(self.disconnect_cb)
+            self.client.on_error(self.error_cb)
+        self.client.create_connection()
+
+    def close_connection(self, *args):
+        if self.request_timer.isActive():
+            self.controlPanel.push_buttons.get("REQUEST").click()
+
+        if self.client is None:
+            print("No connection to close")
+            return
+        # self.current_cmd = BYE_CMD
+
+        # self.client.write(BYE_CMD)
+        # self.cmds_queue.put_nowait(BYE_CMD)
+        self.client.close_connection()
+
+    def received_callback(self, raw_data: bytes):  # use app config to parse data
+        """Callback triggered on data received by the connection class"""
+        try:
+            data = str(raw_data, encoding='ascii')
+            cmd = self.cmds_queue.get(
+                block=False)  # if the callback is called then a cmd already exists in the FIFO Queue
+            print("latest cmd: ", cmd)
+            self.client.is_free = False
+            if is_json(data):  # only handle json if its a json format
+                request = Request.parse_obj(json.loads(data))
+                if self.line_graphs_list:
+                    for p, g in zip(self.line_graph_parsers, self.line_graphs_list):
+                        print("sample size: ", self.sample_size)
+                        p(request)
+                        g.updateFigure(p.data)
+
+                        if not g.isVisible():
+                            g.show()
+                if self.level_graph_list:
+                    for p, g in zip(self.level_graph_parsers, self.level_graph_list):
+                        p(request)
+                        g.updateFigure(p.data)
+                        if not g.isVisible():
+                            g.show()
+                if self.vector_graph_list:
+                    for p, g in zip(self.vector_graph_parsers, self.vector_graph_list):
+                        p(request)
+                        g.updateFigure(p.data)
+                        if not g.isVisible():
+                            g.show()
+
+            else:
+                # cmd == INIT_CMD:
+                d = data.split()
+                try:
+                    freq_begin = d.index("Frequency:") + 1
+                    freq_end = d.index("Hz")
+                    id_begin = d.index("Channels:") + 1
+                    # raw_Res = dict(SamplingFrequency= d[d.])
+                    res = InitResponse(SamplingFrequency=list(float(f) for f in d[freq_begin:freq_end]),
+                                       ChannelIDs=list(int(id_) for id_ in d[
+                                                                           id_begin:]), )  # can be handy for more complicated applications
+                    sample_size = round((self.refresh_rate / 1000) * max(1, round(min(res.SamplingFrequency))))
+                    print(f"SAMPLE RATE: {sample_size}")
+                    self.sample_size = max(1, min(round(sample_size / self.slice_size), self.max_sample_request))
+                    print(f"INIT RESPONSE LOOKS LIKE THIS: {res}")
+                    print(f"NEW SAMPLE RATE: {self.sample_size}")
+                except Exception as e:
+                    print(f"UNKNOWN RESPONSE FORMAT: {data}")
+                # list(map(int, "42 0".split()))
+            # elif cmd == BYE_CMD:
+            #     print(f"BYE RESPONSE LOOKS LIKE THIS: {data}")
+            # else:
+            #     print(f"UNKNOWN RESPONSE FORMAT: {len(data)}")
+        except Exception as e:
+
+            import traceback
+            print(traceback.format_exc())
+        self.client.is_free = True
+
+    def requesting_callback(self, *args):
+        b = self.controlPanel.push_buttons.get("REQUEST")
+        if self.request_timer.isActive():
+            b.setText("Request")
+            self.request_timer.stop()
+            self.init_timer.stop()
+            return
+        b.setText("Stop")
+        self.request_timer.start(self.refresh_rate)
+        self.init_timer.start(10000)
+
+    # def create_lvl_graphs(self, prefix):
+    #     self.level_graph_list = []  # overwrite class member
+    #     factory = QTFactory()
+    #     structure = GraphStructure(ID=f"{prefix} Level Graph Test {0}", grid=True, blit=True,  # with_lines=False,
+    #                                elements=dict(
+    #                                    g1=ElementStructure(X_init=np.array(range(7)), Y_init=np.array([0] * 7),
+    #                                                        color="b", label=f"real ch0-ch6"),
+    #                                    g2=ElementStructure(X_init=np.array(range(7)), Y_init=np.array([0] * 7),
+    #                                                        color="r", label=f"real ch7-ch14"),
+    #                                ), )
+    #     self.level_graph_list.append(factory.get_LevelGraph(structure, spawning_position=1))
+    #     structure = GraphStructure(ID=f"{prefix} Level Graph Test {1}", grid=True, blit=True,  # with_lines=False
+    #                                elements=dict(
+    #                                    g1=ElementStructure(X_init=np.array([0] * 7), Y_init=np.array(range(7)),
+    #                                                        color="b", label=f"imag ch0-ch6"),
+    #                                    g2=ElementStructure(X_init=np.array([0] * 7), Y_init=np.array(range(7)),
+    #                                                        color="r", label=f"imag ch7-ch14"),
+    #                                ))
+    #     self.level_graph_list.append(factory.get_LevelGraph(structure, spawning_position=2))
+    #
+    # def create_line_graphs(self, prefix):
+    #     self.line_graphs_list = []  # overwrite class member
+    #     factory = QTFactory()
+    #     line_graph_struct = GraphStructure(ID=f"{prefix} Line Graph Test 0", grid=True, blit=True,
+    #                                        elements=dict(
+    #                                            g1=ElementStructure(sensorID=0, color="b", label="ch0"),
+    #                                            g2=ElementStructure(sensorID=1, color="g", label="ch1"),
+    #                                            g3=ElementStructure(sensorID=2, color="k", label="ch2"),
+    #                                            g4=ElementStructure(sensorID=3, color="r", label="ch3"),
+    #                                            g5=ElementStructure(sensorID=4, color="c", label="ch4"),
+    #                                            g6=ElementStructure(sensorID=5, color="m", label="ch5"),
+    #                                            g7=ElementStructure(sensorID=6, color="k", label="ch6"), )
+    #                                        )
+    #     DS = factory.get_LineGraph_DataStructure()
+    #     RB = DS.get_RB()
+    #     data = DS(Data={0: (RB(size_max=10000), RB(size_max=10000)),
+    #                     1: (RB(size_max=10000), RB(size_max=10000)),
+    #                     2: (RB(size_max=10000), RB(size_max=10000)),
+    #                     3: (RB(size_max=10000), RB(size_max=10000)),
+    #                     4: (RB(size_max=10000), RB(size_max=10000)),
+    #                     5: (RB(size_max=10000), RB(size_max=10000)),
+    #                     6: (RB(size_max=10000), RB(size_max=10000)),
+    #                     })
+    #     self.line_graphs_list.append((factory.get_LineGraph(line_graph_struct, spawning_position=3), data))
+    #
+    #     line_graph_struct = GraphStructure(ID=f"{prefix} Line Graph Test 1", grid=True, blit=True,
+    #                                        elements=dict(
+    #                                            g1=ElementStructure(sensorID=7, color="b", label="ch7"),
+    #                                            g2=ElementStructure(sensorID=8, color="r", label="ch8"),
+    #                                            g3=ElementStructure(sensorID=9, color="r", label="ch9"),
+    #                                            g4=ElementStructure(sensorID=10, color="r", label="ch10"),
+    #                                            g5=ElementStructure(sensorID=11, color="r", label="ch11"),
+    #                                            g6=ElementStructure(sensorID=12, color="r", label="ch12"),
+    #                                            g7=ElementStructure(sensorID=13, color="r", label="ch13"), )
+    #                                        )
+    #     data = DS(Data={7: (RB(size_max=10000), RB(size_max=10000)),
+    #                     8: (RB(size_max=10000), RB(size_max=10000)),
+    #                     9: (RB(size_max=10000), RB(size_max=10000)),
+    #                     10: (RB(size_max=10000), RB(size_max=10000)),
+    #                     11: (RB(size_max=10000), RB(size_max=10000)),
+    #                     12: (RB(size_max=10000), RB(size_max=10000)),
+    #                     13: (RB(size_max=10000), RB(size_max=10000)),
+    #                     })
+    #
+    #     self.line_graphs_list.append((factory.get_LineGraph(line_graph_struct, spawning_position=4), data))
+
+    def close_graphs(self, *args):
+        if self.level_graph_list:
+            for g in self.level_graph_list:
+                g.close()
+        if self.line_graphs_list:
+            for g in self.line_graphs_list:
+                g.close()
+        if self.vector_graph_list:
+            for g in self.vector_graph_list:
+                g.close()
+
+    def take_screenshot(self, event, path=r"D:\HZDR\HZDR_VISU_TOOL\Examples\PegelApp\screenshots"):
+        if self.level_graph_list is None:
+            print("No graphs to screenshot")
+            return
+        # print(self.graph_list)
+        if self.level_graph_list:
+            for i, g in enumerate(self.level_graph_list):
+                g.take_screenshot(path=path, ID=i)
+        if self.line_graphs_list:
+            for i, g in zip(range(2, 4), self.line_graphs_list):
+                g[0].take_screenshot(path=path, ID=i)
+        if self.vector_graph_list:
+            for i, g in enumerate(self.vector_graph_list):
+                g.take_screenshot(path=path, ID=i)
+
+    def init_server(self, *args):
+        if self.client is None:
+            print("No Connection")
+            return
+        if self.client.is_free:
+            print(f"{INIT_CMD} {self.data_type}\n")
+            self.client.write(f"{INIT_CMD} {self.data_type}\n")
+            self.cmds_queue.put(INIT_CMD, block=False)
+
+    def request_data(self, *args):
+        if self.client is None:
+            print("No Connection")
+            return
+        if self.client.is_free:
+            self.client.write(f"{GET_CMD} {self.data_type} -json {self.sample_size}\n")
+            self.cmds_queue.put(GET_CMD, block=False)
+
+    def create_controlPanel(self, title):
+        self.request_timer.timeout.connect(self.request_data)
+        self.init_timer.timeout.connect(self.init_server)
+        self.controlPanel = BaseControlPanel(title)
+        self.controlPanel.on_close(self.close_graphs)
+        self.controlPanel.on_close(self.close_connection)
+
+        # example of using a UID to keep track of the object added while also providing a callback function at creation
+        self.controlPanel.add_push_button("Connect", (0, 0), callback=self.create_client, UID="CONNECT")
+        self.controlPanel.add_push_button("Init", (1, 0), callback=self.init_server, UID="INIT")
+
+        # example of using the provided objet to directly link it to a callback
+        request_b = self.controlPanel.add_push_button("Request", (2, 0), UID="REQUEST")
+        request_b.clicked.connect(self.requesting_callback)
+
+        self.controlPanel.add_push_button("Disconnect", (3, 0), callback=self.close_connection,
+                                          UID="DISCONNECT")
+        self.controlPanel.add_Icon("Connection", r"D:\HZDR\HZDR_VISU_TOOL\Examples\PegelApp\no_connection.png",
+                                   (0, 1, 3, 1), UID="CONNECTION_STATUS")
+        self.controlPanel.add_push_button("Screenshot", (3, 1), self.take_screenshot, UID="SCREENSHOT")
+        self.controlPanel.show()
+
+
+"""                request = Request.parse_obj(json.loads(data))
+                sid = 0
+                for g, d in self.line_graphs_list:
+                    # TODO: WRITE PARSERS FOR DIFFERENT TYPES OF DATA GRAPHS AND DATA STRUCTURES
+                    for j in range(7):  # use sensor ids instead
+                        if request.Body.data.channels.get(sid) is None:
+                            print(f"This Sensor ID doesn't exist in the request Body: {sid}")
+                        else:
+                            d.Data[sid][0].append(request.Body.data.channels.get(sid).timestamp)
+                            d.Data[sid][1].append(request.Body.data.channels.get(sid).real)
+                        sid += 1
+                    d.slice_size = 10
+                    g.updateFigure(d)
+                    # g.autoscale_trigger(False)
+                    g.show()
+
+                DS = self.level_graph_list[0].get_data_container()
+
+                for j, graph in enumerate(self.level_graph_list):
+                    xD = dict()
+                    yD = dict()
+                    # for grp in np.array([request.Body.data.channels[i].real[-1] for i in grp]):
+                    if (j):  # imag
+                        ims = np.array(
+                            [[request.Body.data.channels[i].imag[-1] for i in grp] for grp in self.groups])
+                        # im1 = np.array([request.Body.data.channels[i].imag[-1] for i in self.groups[1]])
+                        for i, im in enumerate(ims):
+                            yD[f"g{i + 1}"] = np.array(range(len(im)))
+                            xD[f"g{i + 1}"] = im
+                    else:  # real
+                        rs = np.array(
+                            [[request.Body.data.channels[i].real[-1] for i in grp] for grp in self.groups])
+                        for i, r in enumerate(rs):
+                            xD[f"g{i + 1}"] = np.array(range(len(r)))
+                            yD[f"g{i + 1}"] = r
+
+                    graph.updateFigure(DS(x_Data=xD,
+                                          y_Data=yD,
+                                          slice_size=1))
+                    # graph.autoscale_trigger(False)
+                    graph.show()"""

@@ -38,18 +38,20 @@ class RequestStatus(BaseModel):
 
 class ChannelData(BaseModel):
     """Class representing the basic channel data"""
+    timestamp: List[float]
     real: List[float]
     imag: List[float]
     # data needed for vector graphs
     U: Optional[List[float]]
     V: Optional[List[float]]
 
+    def get_by_name(self, member_name: str):
+        return self.__dict__.get(member_name)
+
 
 class RequestData(BaseModel):
     """Class representing the data in the request body"""
-    dataSize: int
-    timesteps: List[float]  # equivalent to the t or x axes in most cases
-    channels: Dict[str, ChannelData]
+    channels: Dict[int, ChannelData]
 
     class Config:
         validation = False
@@ -94,6 +96,7 @@ class RequestData(BaseModel):
 class RequestMetaData(BaseModel):
     """Class representing the data in the request body"""
     dataNature: str
+    serialNumbers: List[int]
     comment: Optional[str]
 
 
@@ -108,6 +111,10 @@ class Request(BaseModel):
     Status: RequestStatus
     Body: RequestBody
 
+
+class InitResponse(BaseModel):
+    SamplingFrequency: List[float]
+    ChannelIDs: List[int]
 
 if __name__ == "__main__":
     import json

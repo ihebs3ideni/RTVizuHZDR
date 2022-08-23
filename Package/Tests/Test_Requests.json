@@ -3,16 +3,8 @@
                "message" : "NOT FOUND" },
      "Body": {
        "data": {
-         "timesteps": [
-           0,
-           1,
-           2,
-           3,
-           4
-         ],
-        "dataSize": 5,
        "channels": {
-         "channel_1": {
+         "0": {
            "real": [
              1,
              2,
@@ -26,9 +18,16 @@
              3,
              4,
              5
+           ],
+           "timestamp": [
+             1,
+             2,
+             3,
+             4,
+             5
            ]
          },
-         "channel_2": {
+         "1": {
            "real": [
              2,
              3,
@@ -42,9 +41,16 @@
              3,
              4,
              5
+           ],
+           "timestamp": [
+             1,
+             2,
+             3,
+             4,
+             5
            ]
          },
-         "channel_3": {
+         "2": {
            "real": [
              3,
              4,
@@ -58,30 +64,53 @@
              3,
              4,
              5
+           ],
+           "timestamp": [
+             1,
+             2,
+             3,
+             4,
+             5
+           ]
+         },
+         "3": {
+           "real": [
+             3,
+             4,
+             5,
+             6,
+             7
+           ],
+           "imag": [
+             1,
+             2,
+             3,
+             4,
+             5
+           ],
+           "timestamp": [
+             69,
+             78,
+             81,
+             83,
+             96
            ]
          }
        }
        },
        "metaData": {
          "comment": "wrongDatasize",
-         "dataNature": "manually generated data"
+         "dataNature": "manually generated data",
+         "serialNumbers": [123]
        }
      }
 
     },
-  "wrongDatasize":{
+  "no_timestamps":{
     "Status": {"code": 404,
                "message" : "NOT FOUND" },
      "Body": {
        "data": {
-         "timesteps": [
-           0,
-           1,
-           2,
-           3,
-           4
-         ],
-        "dataSize": 1,
        "channels": {
          "channel_1": {
            "real": [
@@ -135,7 +164,8 @@
        },
        "metaData": {
          "comment": "wrongDatasize",
-         "dataNature": "manually generated data"
+         "dataNature": "manually generated data",
+         "serial_numbers": [123]
        }
      }
 
@@ -144,16 +174,7 @@
     "Status": {"code": 404,
                "message" : "NOT FOUND" },
      "Body": {
-       "data": {
-         "timesteps": [
-           0,
-           1,
-           9,
-           3,
-           4
-         ],
-        "dataSize": 5,
-       "channels": {
+"channels": {
          "channel_1": {
            "real": [
              1,
@@ -163,6 +184,13 @@
              5
            ],
            "imag": [
+             1,
+             2,
+             3,
+             4,
+             5
+           ],
+           "timestamp": [
              1,
              2,
              3,
@@ -184,6 +212,13 @@
              3,
              4,
              5
+           ],
+           "timestamp": [
+             1,
+             78,
+             3,
+             4,
+             45
            ]
          },
          "channel_3": {
@@ -200,9 +235,15 @@
              3,
              4,
              5
+           ],
+           "timestamp": [
+             1,
+             2,
+             3,
+             4,
+             5
            ]
          }
-       }
        },
        "metaData": {
          "comment": "UnorderedTimeSerie",

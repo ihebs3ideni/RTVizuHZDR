@@ -2,7 +2,5 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/hzdr_visu_tool" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/initial-branch=main" vcs="Git" />
   </component>
 </project>

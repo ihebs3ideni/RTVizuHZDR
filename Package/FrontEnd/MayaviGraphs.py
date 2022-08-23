@@ -49,10 +49,10 @@ class MayaviDynamicGraph(MayaviBaseGraph):
             pItem = self.get_data_container()
             """this assumes that x, y and z are created using np.mgrid"""
 
-            field_data = pItem(x_Data=e.X, y_Data=e.Y, z_Data=e.Z, u_Data=np.cos(e.X), v_Data=np.sin(e.Y),
-                               w_Data=np.ones_like(e.Z) * 0.5)
-            grid_data = pItem(x_Data=e.X, y_Data=e.Y, z_Data=e.Z, u_Data=np.zeros_like(e.X), v_Data=np.zeros_like(e.X),
-                              w_Data=np.zeros_like(e.X))
+            field_data = pItem(x_Data=e.X_init, y_Data=e.Y_init, z_Data=e.Z_init, u_Data=np.cos(e.X_init), v_Data=np.sin(e.Y_init),
+                               w_Data=np.ones_like(e.Z_init) * 0.5)
+            grid_data = pItem(x_Data=e.X_init, y_Data=e.Y_init, z_Data=e.Z_init, u_Data=np.zeros_like(e.X_init), v_Data=np.zeros_like(e.X_init),
+                              w_Data=np.zeros_like(e.X_init))
             vf, vf_id = self.dynamic_canvas.AddVFSource(field_data)
             sf, sf_id = self.dynamic_canvas.AddGlyphSource(grid_data)
 
