@@ -63,6 +63,15 @@ class GENERICApp:
     cmds_queue: Queue = Queue()
     data_type: str = "-raw"
     max_sample_request = 1
+    paused_: bool = False
+
+    def click_callback(self, graph):
+        print(f"graph {graph} clicked\n")
+        graph.autoscale_trigger(not graph.autoscale_flag)
+        # for list_ in [self.line_graphs_list, self.level_graph_list, self.vector_graph_list]:
+        #     if list_:
+        #         for g in list_:
+        #             g.autoscale_trigger(not g.autoscale_flag)
 
     def create_from_config(self, config: AppConfig):
         # create_line graphs and their parsers
@@ -76,14 +85,14 @@ class GENERICApp:
                 if factory is None:
                     factory = QTFactory()
                 struct = line_graph_config.structure
-                self.line_graphs_list.append(
-                    factory.get_LineGraph(struct, spawning_position=line_graph_config.spawning_position))
+                g = factory.get_LineGraph(struct, spawning_position=line_graph_config.spawning_position)
+                g.set_onclicked_callback(lambda event, graph_=g: self.click_callback(graph_))
+                self.line_graphs_list.append(g)
                 self.line_graph_parsers.append(LineGraphParser(graph_structure=struct, factory_=factory,
                                                                Buffer_size_=line_graph_config.history,
                                                                x_axis_id=line_graph_config.x_axis_id,
-                                                               y_axis_id=line_graph_config.y_axis_id,
-                                                               slice_size_=self.slice_size))
-            self.line_graphs_list[-1].autoscale_flag = False
+                                                               y_axis_id=line_graph_config.y_axis_id))
+                # self.line_graphs_list[-1].set_onclicked_callback(lambda event: self.click_callback(self.line_graphs_list[-1]))
         if config.LevelGraphs:
             self.level_graph_list = []
             self.level_graph_parsers = []
@@ -92,12 +101,13 @@ class GENERICApp:
                 if factory is None:
                     factory = QTFactory()
                 struct = lvl_graph_config.structure
-                self.level_graph_list.append(
-                    factory.get_LevelGraph(struct, spawning_position=lvl_graph_config.spawning_position))
+                g = factory.get_LevelGraph(struct, spawning_position=lvl_graph_config.spawning_position)
+                g.set_onclicked_callback(lambda event, graph_=g: self.click_callback(graph_))
+                self.level_graph_list.append(g)
                 self.level_graph_parsers.append(
                     LevelGraphParser(graph_structure=struct, factory_=factory, x_axis_id=lvl_graph_config.x_axis_id,
                                      y_axis_id=lvl_graph_config.y_axis_id))
-            self.level_graph_list[-1].autoscale_flag = False
+                # self.level_graph_list[-1].set_onclicked_callback(lambda event: self.click_callback(self.level_graph_list[-1]))
 
         if config.VectorGraphs:
             self.vector_graph_list = []
@@ -107,12 +117,13 @@ class GENERICApp:
                 if factory is None:
                     factory = MPLFactory()
                 struct = vector_graph_config.structure
-                self.vector_graph_list.append(
-                    factory.get_VectorGraph(struct, spawning_position=vector_graph_config.spawning_position))
+                g = factory.get_VectorGraph(struct, spawning_position=vector_graph_config.spawning_position)
+                g.set_onclicked_callback(lambda event, graph_=g: self.click_callback(graph_))
+                self.vector_graph_list.append(g)
                 self.vector_graph_parsers.append(
                     VectorGraphParser(graph_structure=struct, factory_=factory, x_axis_id=vector_graph_config.x_axis_id,
                                       y_axis_id=vector_graph_config.y_axis_id, z_axis_id=vector_graph_config.z_axis_id))
-            self.vector_graph_list[-1].autoscale_flag = False
+                # self.vector_graph_list[-1].set_onclicked_callback(lambda event: self.click_callback(self.vector_graph_list[-1]))
 
     def connect_cb(self, *args):
         if self.request_processed:
@@ -168,30 +179,32 @@ class GENERICApp:
             data = str(raw_data, encoding='ascii')
             cmd = self.cmds_queue.get(
                 block=False)  # if the callback is called then a cmd already exists in the FIFO Queue
-            print("latest cmd: ", cmd)
+            # print("latest cmd: ", cmd)
             self.client.is_free = False
             if is_json(data):  # only handle json if its a json format
                 request = Request.parse_obj(json.loads(data))
                 if self.line_graphs_list:
                     for p, g in zip(self.line_graph_parsers, self.line_graphs_list):
-                        print("sample size: ", self.sample_size)
+                        # print("sample size: ", self.sample_size)
                         p(request)
-                        g.updateFigure(p.data)
-
-                        if not g.isVisible():
-                            g.show()
+                        if not self.paused_:
+                            g.updateFigure(p.data)
+                            if not g.isVisible():
+                                g.show()
                 if self.level_graph_list:
                     for p, g in zip(self.level_graph_parsers, self.level_graph_list):
                         p(request)
-                        g.updateFigure(p.data)
-                        if not g.isVisible():
-                            g.show()
+                        if not self.paused_:
+                            g.updateFigure(p.data)
+                            if not g.isVisible():
+                                g.show()
                 if self.vector_graph_list:
                     for p, g in zip(self.vector_graph_parsers, self.vector_graph_list):
                         p(request)
-                        g.updateFigure(p.data)
-                        if not g.isVisible():
-                            g.show()
+                        if not self.paused_:
+                            g.updateFigure(p.data)
+                            if not g.isVisible():
+                                g.show()
 
             else:
                 # cmd == INIT_CMD:
@@ -204,9 +217,16 @@ class GENERICApp:
                     res = InitResponse(SamplingFrequency=list(float(f) for f in d[freq_begin:freq_end]),
                                        ChannelIDs=list(int(id_) for id_ in d[
                                                                            id_begin:]), )  # can be handy for more complicated applications
-                    sample_size = round((self.refresh_rate / 1000) * max(1, round(min(res.SamplingFrequency))))
-                    print(f"SAMPLE RATE: {sample_size}")
-                    self.sample_size = max(1, min(round(sample_size / self.slice_size), self.max_sample_request))
+                    # sample_size =
+                    # print("SZ: ", sample_size)
+                    # print("sliced SZ: ", round(sample_size / self.slice_size))
+                    # print("max_sample_request: ", self.max_sample_request)
+                    # if round(sample_size / self.slice_size) > self.max_sample_request:
+                    #     sample_size = self.max_sample_request
+                    # print(f"SAMPLE RATE: {sample_size}")
+                    self.sample_size = max(1, round((self.refresh_rate / 1000) * max(1, round(min(res.SamplingFrequency)))))
+                    if (self.sample_size/self.slice_size) > self.max_sample_request:
+                        raise Exception(f"Requested sample size is greater than the buffer size: {self.sample_size/self.slice_size} > {self.max_sample_request}")
                     print(f"INIT RESPONSE LOOKS LIKE THIS: {res}")
                     print(f"NEW SAMPLE RATE: {self.sample_size}")
                 except Exception as e:
@@ -217,7 +237,6 @@ class GENERICApp:
             # else:
             #     print(f"UNKNOWN RESPONSE FORMAT: {len(data)}")
         except Exception as e:
-
             import traceback
             print(traceback.format_exc())
         self.client.is_free = True
@@ -233,71 +252,13 @@ class GENERICApp:
         self.request_timer.start(self.refresh_rate)
         self.init_timer.start(10000)
 
-    # def create_lvl_graphs(self, prefix):
-    #     self.level_graph_list = []  # overwrite class member
-    #     factory = QTFactory()
-    #     structure = GraphStructure(ID=f"{prefix} Level Graph Test {0}", grid=True, blit=True,  # with_lines=False,
-    #                                elements=dict(
-    #                                    g1=ElementStructure(X_init=np.array(range(7)), Y_init=np.array([0] * 7),
-    #                                                        color="b", label=f"real ch0-ch6"),
-    #                                    g2=ElementStructure(X_init=np.array(range(7)), Y_init=np.array([0] * 7),
-    #                                                        color="r", label=f"real ch7-ch14"),
-    #                                ), )
-    #     self.level_graph_list.append(factory.get_LevelGraph(structure, spawning_position=1))
-    #     structure = GraphStructure(ID=f"{prefix} Level Graph Test {1}", grid=True, blit=True,  # with_lines=False
-    #                                elements=dict(
-    #                                    g1=ElementStructure(X_init=np.array([0] * 7), Y_init=np.array(range(7)),
-    #                                                        color="b", label=f"imag ch0-ch6"),
-    #                                    g2=ElementStructure(X_init=np.array([0] * 7), Y_init=np.array(range(7)),
-    #                                                        color="r", label=f"imag ch7-ch14"),
-    #                                ))
-    #     self.level_graph_list.append(factory.get_LevelGraph(structure, spawning_position=2))
-    #
-    # def create_line_graphs(self, prefix):
-    #     self.line_graphs_list = []  # overwrite class member
-    #     factory = QTFactory()
-    #     line_graph_struct = GraphStructure(ID=f"{prefix} Line Graph Test 0", grid=True, blit=True,
-    #                                        elements=dict(
-    #                                            g1=ElementStructure(sensorID=0, color="b", label="ch0"),
-    #                                            g2=ElementStructure(sensorID=1, color="g", label="ch1"),
-    #                                            g3=ElementStructure(sensorID=2, color="k", label="ch2"),
-    #                                            g4=ElementStructure(sensorID=3, color="r", label="ch3"),
-    #                                            g5=ElementStructure(sensorID=4, color="c", label="ch4"),
-    #                                            g6=ElementStructure(sensorID=5, color="m", label="ch5"),
-    #                                            g7=ElementStructure(sensorID=6, color="k", label="ch6"), )
-    #                                        )
-    #     DS = factory.get_LineGraph_DataStructure()
-    #     RB = DS.get_RB()
-    #     data = DS(Data={0: (RB(size_max=10000), RB(size_max=10000)),
-    #                     1: (RB(size_max=10000), RB(size_max=10000)),
-    #                     2: (RB(size_max=10000), RB(size_max=10000)),
-    #                     3: (RB(size_max=10000), RB(size_max=10000)),
-    #                     4: (RB(size_max=10000), RB(size_max=10000)),
-    #                     5: (RB(size_max=10000), RB(size_max=10000)),
-    #                     6: (RB(size_max=10000), RB(size_max=10000)),
-    #                     })
-    #     self.line_graphs_list.append((factory.get_LineGraph(line_graph_struct, spawning_position=3), data))
-    #
-    #     line_graph_struct = GraphStructure(ID=f"{prefix} Line Graph Test 1", grid=True, blit=True,
-    #                                        elements=dict(
-    #                                            g1=ElementStructure(sensorID=7, color="b", label="ch7"),
-    #                                            g2=ElementStructure(sensorID=8, color="r", label="ch8"),
-    #                                            g3=ElementStructure(sensorID=9, color="r", label="ch9"),
-    #                                            g4=ElementStructure(sensorID=10, color="r", label="ch10"),
-    #                                            g5=ElementStructure(sensorID=11, color="r", label="ch11"),
-    #                                            g6=ElementStructure(sensorID=12, color="r", label="ch12"),
-    #                                            g7=ElementStructure(sensorID=13, color="r", label="ch13"), )
-    #                                        )
-    #     data = DS(Data={7: (RB(size_max=10000), RB(size_max=10000)),
-    #                     8: (RB(size_max=10000), RB(size_max=10000)),
-    #                     9: (RB(size_max=10000), RB(size_max=10000)),
-    #                     10: (RB(size_max=10000), RB(size_max=10000)),
-    #                     11: (RB(size_max=10000), RB(size_max=10000)),
-    #                     12: (RB(size_max=10000), RB(size_max=10000)),
-    #                     13: (RB(size_max=10000), RB(size_max=10000)),
-    #                     })
-    #
-    #     self.line_graphs_list.append((factory.get_LineGraph(line_graph_struct, spawning_position=4), data))
+    def pausing_callback(self, *args):
+        b = self.controlPanel.push_buttons.get("PAUSE")
+        if self.paused_ and b:
+            b.setText("Pause")
+        else:
+            b.setText("Play")
+        self.paused_ = not self.paused_
 
     def close_graphs(self, *args):
         if self.level_graph_list:
@@ -338,8 +299,13 @@ class GENERICApp:
         if self.client is None:
             print("No Connection")
             return
+        if self.sample_size == 0:
+            print("0 SAMPLES REQUESTED, ADJUST THE REFRESH RATE\n")
+            return
+        if self.slice_size<1:
+            print(f"Slice size must be great or equal to 1, {self.slice_size} provided\n")
         if self.client.is_free:
-            self.client.write(f"{GET_CMD} {self.data_type} -json {self.sample_size}\n")
+            self.client.write(f"{GET_CMD} {self.data_type} -json {self.sample_size} -sliced {self.slice_size}\n")
             self.cmds_queue.put(GET_CMD, block=False)
 
     def create_controlPanel(self, title):
@@ -356,11 +322,13 @@ class GENERICApp:
         # example of using the provided objet to directly link it to a callback
         request_b = self.controlPanel.add_push_button("Request", (2, 0), UID="REQUEST")
         request_b.clicked.connect(self.requesting_callback)
+        pause_b = self.controlPanel.add_push_button("Pause", (2, 1), UID="PAUSE")
+        pause_b.clicked.connect(self.pausing_callback)
 
         self.controlPanel.add_push_button("Disconnect", (3, 0), callback=self.close_connection,
                                           UID="DISCONNECT")
         self.controlPanel.add_Icon("Connection", r"D:\HZDR\HZDR_VISU_TOOL\Examples\PegelApp\no_connection.png",
-                                   (0, 1, 3, 1), UID="CONNECTION_STATUS")
+                                   (0, 1, 2, 1), UID="CONNECTION_STATUS")
         self.controlPanel.add_push_button("Screenshot", (3, 1), self.take_screenshot, UID="SCREENSHOT")
         self.controlPanel.show()
 

@@ -211,8 +211,8 @@ class MPLLineGraph(MPLBasedGraph):
         try:
             # xs, ys = data.x_Data, data.y_Data
             values = list(data.Data.values())
-            min_x, max_x = np.nanmin(values[0][0].data), np.nanmax(values[0][0].data)
-            min_y, max_y = np.nanmin(values[0][1].data), np.nanmax(values[0][1].data)
+            min_x, max_x = np.inf, np.NINF
+            min_y, max_y = np.inf, np.NINF
 
             for id_, e in self.structure.elements.items():
                 if self.lines[id_].get_visible():
@@ -221,7 +221,7 @@ class MPLLineGraph(MPLBasedGraph):
                     x_data = data.Data.get(sid)[0].data
                     if y_data is not None:
                         min_x = np.minimum(min_x, np.nanmin(x_data))
-                        max_x = np.maximum(max_x, np.nanmin(x_data))
+                        max_x = np.maximum(max_x, np.nanmax(x_data))
                         min_y = np.minimum(min_y, np.nanmin(y_data))
                         max_y = np.maximum(max_y, np.nanmax(y_data))
                         self.lines[id_].set_xdata(x_data)
@@ -230,8 +230,10 @@ class MPLLineGraph(MPLBasedGraph):
                 if self.autoscale_flag:
                     dy = (max_y - min_y) * 0.1
                     self.set_y_lim(min_y - dy, max_y + dy)
-                dx = (max_x - min_x) * 0.1
-                self.set_x_lim(min_x - dx, max_x + dx)
+
+                    dx = (max_x - min_x) * 0.1
+                    # print(f"minx= {min_x-dx}, maxx={max_x+dx}")
+                    self.set_x_lim(min_x - dx, max_x + dx)
 
             if self.blit:
                 self.BM.update()
@@ -314,12 +316,12 @@ class MPLLevelGraph(MPLBasedGraph):
                     self.lines[id_].set_xdata(x)
                     self.lines[id_].set_ydata(y)
 
-            if min_x != np.inf:
+            if min_x != np.inf and max_x != np.NINF:
                 if self.autoscale_flag:
                     dy = (max_y - min_y) * 0.1
                     self.set_y_lim(min_y - dy, max_y + dy)
-                dx = (max_x - min_x) * 0.1
-                self.set_x_lim(min_x - dx, max_x + dx)
+                    dx = (max_x - min_x) * 0.1
+                    self.set_x_lim(min_x - dx, max_x + dx)
 
             if self.blit:
                 self.BM.update()

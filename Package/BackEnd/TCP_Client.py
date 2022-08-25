@@ -43,8 +43,8 @@ class BaseTcpClient(ABC):
     connection_callback: Callable = lambda **kwargs: print("Connection callback triggered")
     disconnection_callback: Callable = lambda **kwargs: print("Disconnection callback triggered")
     receive_callback: Callable = lambda **kwargs: print("Received callback triggered")
-    error_callback: Callable = lambda **kwargs: exec(
-        'raise ClientBaseException(error=None,message=traceback.format_exc())')
+    error_callback: Callable = lambda SocketError, **kwargs: exec(
+        f'raise ClientBaseException(error=SocketError,message=traceback.format_exc())')
     readBufferSize: int = 10 * 1024 ** 2
     is_free: bool = True
 
@@ -114,7 +114,6 @@ class AsyncTCP_Client(BaseTcpClient, asyncore.dispatcher):
         asyncore.dispatcher.__init__(self)
         self.host, self.port = host, port
 
-
     def create_connection(self, host=None, port=None):
         if host is None:
             host = self.host
@@ -137,7 +136,7 @@ class AsyncTCP_Client(BaseTcpClient, asyncore.dispatcher):
         # print("from error handler: ",self.connected)
         # self.error_callback(self.socket.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR))
         raise ClientBaseException(error=self.socket.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR),
-                            message=traceback.format_exc())
+                                  message=traceback.format_exc())
 
     def write(self, data: str):
         self.send(bytes(data, "ascii"))
@@ -146,7 +145,7 @@ class AsyncTCP_Client(BaseTcpClient, asyncore.dispatcher):
         self.connection_callback()
 
     def handle_close(self):
-        print("from close handler: ",self.connected)
+        print("from close handler: ", self.connected)
         self.disconnection_callback()
 
     def handle_read(self):
@@ -185,8 +184,10 @@ from PyQt5.QtNetwork import QHostAddress, QTcpSocket, QAbstractSocket
 class QT_TCPClient(BaseTcpClient):
     """Client class based on the QT event system and adhering the the interface set in BaseTcpClient.
         This class needs to e instantiated inside a QApplication event loop """
+
     def __init__(self, host: str, port: int):
-        self.host, self.port = host, port
+        super().__init__(host, port)
+        # self.host, self.port =
         self.socket = QTcpSocket()
         self.fragments = []
         self.socket.connected.connect(self.handle_connect)
@@ -203,21 +204,21 @@ class QT_TCPClient(BaseTcpClient):
 
     #
     def handle_read(self):
-        raw_data = self.socket.readAll()
+        """accumulates the package's fragments until an EOL is found signaling the end of the message
+           stitches the fragments together and pass the result to the callback provided by the user"""
+        raw_data = self.socket.readAll()  # read all available bytes from the socket
         self.fragments.append(raw_data)
         if raw_data.endsWith(b'\n'):
             self.receive_callback(b''.join(self.fragments))
             self.fragments.clear()
 
-
-
-    #
     def on_error(self, callback: Callable):
-        self.socket.error.connect(callback)
+        self.error_callback = callback
+        # self.socket.error.connect(callback)
 
     def handle_error(self, socketError):
+        # using this controller function instead of binding the callback to the socket to avoid multiple callbacks
         self.error_callback(socketError)
-        # raise ClientBaseException(error=socketError,message="A socket related error has occured")
 
     def isConnected(self) -> bool:
         """returns True if connected and False otherwise"""
@@ -241,8 +242,6 @@ class QT_TCPClient(BaseTcpClient):
                 print("Already connected")
         except OSError:
             raise MakingConnectionException(self.socket, "Connection to the server couldn't be established")
-
-
 
     def close_connection(self):
         if self.isConnected():

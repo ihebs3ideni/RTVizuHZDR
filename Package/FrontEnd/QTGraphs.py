@@ -121,8 +121,8 @@ class QTLineGraph(QTBasedGraph):
         try:
 
             values = list(dataStruct.Data.values())
-            min_x, max_x = np.nanmin(values[0][0].data), np.nanmax(values[0][0].data)
-            min_y, max_y = np.nanmin(values[0][1].data), np.nanmax(values[0][1].data)
+            min_x, max_x = np.inf, np.NINF
+            min_y, max_y = np.inf, np.NINF
 
             for id_, e in self.structure.elements.items():
                 sid = e.sensorID
@@ -130,16 +130,16 @@ class QTLineGraph(QTBasedGraph):
                 x_data = dataStruct.Data.get(sid)[0].data
                 if y_data is not None:
                     min_x = np.minimum(min_x, np.nanmin(x_data))
-                    max_x = np.maximum(max_x, np.nanmin(x_data))
+                    max_x = np.maximum(max_x, np.nanmax(x_data))
                     min_y = np.minimum(min_y, np.nanmin(y_data))
                     max_y = np.maximum(max_y, np.nanmax(y_data))
                     self.lines[id_].setData(x_data, y_data)
-
-            # if self.autoscale_flag:
-            #         dy = (max_y - min_y) * 0.1
-            #         self.set_y_lim(min_y - dy, max_y + dy)
-            # dx = (max_x - min_x) * 0.1
-            # self.set_x_lim(min_x - dx, max_x +dx)
+            if min_x != np.inf and max_x != np.NINF:
+                if self.autoscale_flag:
+                    dy = (max_y - min_y) * 0.1
+                    self.set_y_lim(min_y - dy, max_y + dy)
+                    dx = (max_x - min_x) * 0.1
+                    self.set_x_lim(min_x - dx, max_x + dx)
 
         except Exception as e:
             print(e)
@@ -172,9 +172,11 @@ class QTLevelGraph(QTBasedGraph):
     def __init__(self, structure: GraphStructure, spawning_position: int = None, line_color=(0, 0, 0)):
         super().__init__(structure, spawning_position)
         self.create_canvas()
-        self.lines = dict(
-            (id_, self._dynamic_ax.plot(e.X_init, e.Y_init, pen=pg.mkPen(line_color, width=2)))
-            for id_, e in self.structure.elements.items())
+        if self.structure.with_lines:
+            self.lines = dict(
+                (id_, self._dynamic_ax.plot(e.X_init, e.Y_init, pen=pg.mkPen(line_color, width=2)))
+                for id_, e in self.structure.elements.items())
+
         self.ScatterGroups = dict((id_, self._dynamic_ax.scatterPlot(e.X_init, e.Y_init, pen=pg.mkPen(e.color, width=2),
                                                                      name=e.label, brush=pg.mkBrush(e.color)))
                                   for id_, e in self.structure.elements.items())
@@ -186,9 +188,23 @@ class QTLevelGraph(QTBasedGraph):
         try:
 
             xs, ys = dataStruct.x_Data, dataStruct.y_Data
+            min_x, max_x = np.inf, np.NINF
+            min_y, max_y = np.inf, np.NINF
             for id_, x in xs.items():
+                min_x = np.minimum(min_x, np.nanmin(x))
+                max_x = np.maximum(max_x, np.nanmax(x))
+                min_y = np.minimum(min_y, np.nanmin(ys[id_]))
+                max_y = np.maximum(max_y, np.nanmax(ys[id_]))
                 self.ScatterGroups[id_].setData(x, ys[id_])
-                self.lines[id_].setData(x, ys[id_])
+                if self.lines is not None:
+                    self.lines[id_].setData(x, ys[id_])
+
+            if min_x != np.inf and max_x != np.NINF:
+                if self.autoscale_flag:
+                    dy = (max_y - min_y) * 0.1
+                    self.set_y_lim(min_y - dy, max_y + dy)
+                    dx = (max_x - min_x) * 0.1
+                    self.set_x_lim(min_x - dx, max_x + dx)
 
         except Exception as e:
             if type(e) == AttributeError:
@@ -198,9 +214,10 @@ class QTLevelGraph(QTBasedGraph):
                 print(traceback.format_exc())
 
     def clearPlot(self):
-        if self.lines is not None:
+        if self.ScatterGroups is not None:
             for id_, _ in self.structure.elements.items():
-                self.lines[id_].setData([np.nan], [np.nan])
+                if self.lines is not None:
+                    self.lines[id_].setData([np.nan], [np.nan])
                 self.ScatterGroups[id_].setData([np.nan], [np.nan])
 
     def what_r_u(self, event=None, **kwargs):

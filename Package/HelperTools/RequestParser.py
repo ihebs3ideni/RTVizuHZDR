@@ -26,9 +26,8 @@ class RequestParser(ABC):
 
 class LineGraphParser(RequestParser):
     def __init__(self, graph_structure: GraphStructure, factory_: BaseFactory, Buffer_size_: int,
-                 x_axis_id: str, y_axis_id: str, slice_size_=10):
+                 x_axis_id: str, y_axis_id: str):
         super().__init__(x_axis_id, y_axis_id)
-        self.slices_size = slice_size_
         DS: Type[LineGraphData] = factory_.get_LineGraph_DataStructure()
         RB: Type[RingBuffer] = DS.get_RB()
         dummy_dict = dict()
@@ -43,14 +42,14 @@ class LineGraphParser(RequestParser):
                 continue
             x = request.Body.data.channels.get(sid).get_by_name(self.x_axis_id)
             starting_index = 0
+            last_x = data_[0][0]
             for i, v in enumerate(x):
-                if v > data_[0][-1]:
+                if v > last_x:
                     starting_index = i
                     break
-
-            data_[0].append(x[starting_index:][::self.slices_size])
+            data_[0].append(x[starting_index:])
             data_[1].append(
-                request.Body.data.channels.get(sid).get_by_name(self.y_axis_id)[starting_index:][::self.slices_size])
+                request.Body.data.channels.get(sid).get_by_name(self.y_axis_id)[starting_index:])
 
 
 class LevelGraphParser(RequestParser):

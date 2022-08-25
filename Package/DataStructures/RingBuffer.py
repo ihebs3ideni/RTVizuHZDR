@@ -2,6 +2,7 @@ import numpy as np
 import threading
 from dataclasses import dataclass
 from typing import *
+import json
 
 
 class RingBuffer(object):
@@ -16,7 +17,6 @@ class RingBuffer(object):
         if init_data is not None:
             for f in init_data:
                 self.__append(f)
-
 
         self.lock = threading.Lock()
 
@@ -37,10 +37,10 @@ class RingBuffer(object):
         try:
             with self.lock:
                 self._data = np.roll(self._data, len(value))
-                for v, j_ in zip(value, range(len(value)-1, -1, -1)):
+                for v, j_ in zip(value, range(len(value) - 1, -1, -1)):
                     self._data[j_] = v
                     # print(j_, self._data[j_])
-                if(self.size_ + len(value) ) < self.__size_max:
+                if (self.size_ + len(value)) < self.__size_max:
                     self.size_ += len(value)
                 else:
                     self.size_ = self.__size_max
@@ -53,7 +53,10 @@ class RingBuffer(object):
         self._data.fill(self.__default_value)
 
     def last(self):
-        return self.data[self.__size_max-self.size-1]
+        return self.data[0]
+
+    def first(self):
+        return self.data[-1]
 
     @property
     def data(self) -> np.ndarray:
@@ -67,31 +70,29 @@ class RingBuffer(object):
     def size(self) -> int:
         return self.size_
 
-
     def __getitem__(self, key):
         """get element"""
-        return(self._data[key])
+        return (self._data[key])
 
     def __repr__(self):
         """return string representation"""
         s = self._data.__repr__()
         s = s + '\t' + str(self.size) + "\t" + self.data[::-1].__repr__()
 
-        return(s)
+        return (s)
 
 
-def RBEncoder(o):
-    try:
-        if isinstance(o, RingBuffer):
-            return o.data.tolist()
-        elif isinstance(o, np.ndarray):
-            return o.tolist()
-        else:
-            return repr(o)
-    except TypeError:
-        pass
-
-
+class RBEncoder(json.JSONEncoder):
+    def default(self, obj: Any) -> Any:
+        try:
+            if isinstance(obj, RingBuffer):
+                return obj.data.tolist()
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            else:
+                return repr(obj)
+        except TypeError:
+            pass
 
 
 if __name__ == "__main__":
@@ -100,9 +101,9 @@ if __name__ == "__main__":
     rb.append(list(range(10)))
     for i in range(10):
         rb1.append(i)
-    print(rb)
-    print(rb1)
-    import json
-    d = dict(r1= rb, r2=rb1)
+    print(rb.first(), rb.last())
+    print(rb1.first(), rb1.last())
+    # print(rb1)
+    d = dict(r1=rb, r2=rb1)
     j = json.dumps(d, cls=RBEncoder)
     print(j)

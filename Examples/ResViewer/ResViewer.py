@@ -1,6 +1,6 @@
 import numpy as np
 
-from Examples.generic_app import GENERICApp, AppConfig, GraphStructure, ElementStructure, graphConfig, QTFactory
+from Examples.generic_app import GENERICApp, AppConfig, GraphStructure, ElementStructure, graphConfig, QTFactory, MPLFactory
 from PyQt5.QtWidgets import QApplication
 import sys
 
@@ -14,7 +14,7 @@ if __name__ == '__main__':
                                                   g5=ElementStructure(sensorID=4, color="c", label="ch4"),
                                                   g6=ElementStructure(sensorID=5, color="m", label="ch5"),
                                                   g7=ElementStructure(sensorID=6, color="k", label="ch6"), )
-                                              ), factory=QTFactory(), spawning_position=1, history=500)
+                                              ), factory=MPLFactory(), spawning_position=1, history=500)
     l2 = graphConfig(structure=GraphStructure(ID="Demodulated Line Graph Test 1", grid=True, blit=True,
                                               elements=dict(
                                                   g1=ElementStructure(sensorID=7, color="b", label="ch7"),
@@ -34,7 +34,7 @@ if __name__ == '__main__':
                                      g2=ElementStructure(X_init=np.array(range(7)), Y_init=np.array([0] * 7),
                                                          sensorIDs=list(range(7, 14)),
                                                          color="r", label=f"real ch7-ch14"),
-                                 ), ), factory=QTFactory(), spawning_position=3, x_axis_id="range",
+                                 ), ), factory=MPLFactory(), spawning_position=3, x_axis_id="range",
         y_axis_id="real")
     lvl2 = graphConfig(
         structure=GraphStructure(ID=f"Demodulated Level Graph Test {1}", grid=True, blit=True,  # with_lines=False,
@@ -51,7 +51,7 @@ if __name__ == '__main__':
     conf = AppConfig(LineGraphs=[l1, l2], LevelGraphs=[lvl1, lvl2])
 
     qapp = QApplication(sys.argv)
-    resApp = GENERICApp(refresh_rate=1000, groups=[range(7), range(7, 14)],
+    resApp = GENERICApp(refresh_rate=500, groups=[range(7), range(7, 14)],
                         host="localhost", port=5400, request_processed=True, reference_ids=[15], slice_size=1)
     resApp.create_controlPanel("Result Viewer")
     resApp.create_from_config(conf)
