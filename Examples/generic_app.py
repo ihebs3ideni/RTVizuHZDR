@@ -42,7 +42,6 @@ class AppConfig:
 @dataclass
 class GENERICApp:
     refresh_rate: int
-    groups: List[range]  # TODO:remove
     host: str
     port: int
     slice_size: int
@@ -224,9 +223,12 @@ class GENERICApp:
                     # if round(sample_size / self.slice_size) > self.max_sample_request:
                     #     sample_size = self.max_sample_request
                     # print(f"SAMPLE RATE: {sample_size}")
-                    self.sample_size = max(1, round((self.refresh_rate / 1000) * max(1, round(min(res.SamplingFrequency)))))
-                    if (self.sample_size/self.slice_size) > self.max_sample_request:
-                        raise Exception(f"Requested sample size is greater than the buffer size: {self.sample_size/self.slice_size} > {self.max_sample_request}")
+                    ratio = round(self.refresh_rate / 1000)
+                    self.sample_size = max(ratio, ratio * round(min(res.SamplingFrequency)))
+                    # self.sample_size = min(self.sample_size, self.max_sample_request)
+                    if (self.sample_size / self.slice_size) > self.max_sample_request:
+                        raise Exception(
+                            f"Requested sample size is greater than the buffer size: {self.sample_size / self.slice_size} > {self.max_sample_request}")
                     print(f"INIT RESPONSE LOOKS LIKE THIS: {res}")
                     print(f"NEW SAMPLE RATE: {self.sample_size}")
                 except Exception as e:
@@ -302,7 +304,7 @@ class GENERICApp:
         if self.sample_size == 0:
             print("0 SAMPLES REQUESTED, ADJUST THE REFRESH RATE\n")
             return
-        if self.slice_size<1:
+        if self.slice_size < 1:
             print(f"Slice size must be great or equal to 1, {self.slice_size} provided\n")
         if self.client.is_free:
             self.client.write(f"{GET_CMD} {self.data_type} -json {self.sample_size} -sliced {self.slice_size}\n")

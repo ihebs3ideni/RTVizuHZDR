@@ -36,10 +36,13 @@ class RingBuffer(object):
         """
         try:
             with self.lock:
+                # put only the last elements of the provided array that can fill the buffer instead of unnecessary
+                # rewriting
+                if self.__size_max < len(value):
+                    value = value[-self.__size_max-1: -1]
                 self._data = np.roll(self._data, len(value))
                 for v, j_ in zip(value, range(len(value) - 1, -1, -1)):
                     self._data[j_] = v
-                    # print(j_, self._data[j_])
                 if (self.size_ + len(value)) < self.__size_max:
                     self.size_ += len(value)
                 else:

@@ -125,15 +125,16 @@ class QTLineGraph(QTBasedGraph):
             min_y, max_y = np.inf, np.NINF
 
             for id_, e in self.structure.elements.items():
-                sid = e.sensorID
-                y_data = dataStruct.Data.get(sid)[1].data
-                x_data = dataStruct.Data.get(sid)[0].data
-                if y_data is not None:
-                    min_x = np.minimum(min_x, np.nanmin(x_data))
-                    max_x = np.maximum(max_x, np.nanmax(x_data))
-                    min_y = np.minimum(min_y, np.nanmin(y_data))
-                    max_y = np.maximum(max_y, np.nanmax(y_data))
-                    self.lines[id_].setData(x_data, y_data)
+                if self.lines[id_].isVisible():
+                    sid = e.sensorID
+                    y_data = dataStruct.Data.get(sid)[1].data
+                    x_data = dataStruct.Data.get(sid)[0].data
+                    if y_data is not None:
+                        min_x = np.minimum(min_x, np.nanmin(x_data))
+                        max_x = np.maximum(max_x, np.nanmax(x_data))
+                        min_y = np.minimum(min_y, np.nanmin(y_data))
+                        max_y = np.maximum(max_y, np.nanmax(y_data))
+                        self.lines[id_].setData(x_data, y_data)
             if min_x != np.inf and max_x != np.NINF:
                 if self.autoscale_flag:
                     dy = (max_y - min_y) * 0.1
