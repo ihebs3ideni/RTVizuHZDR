@@ -51,9 +51,11 @@ class RingBuffer(object):
             with self.lock:
                 self.__append(value)
 
-    def clear(self):
+    def clear(self, empty_value=None):
+        if empty_value is None:
+            empty_value = self.__default_value
         self._data = np.empty(self.__size_max, dtype=None)
-        self._data.fill(self.__default_value)
+        self._data.fill(empty_value)
 
     def last(self):
         return self.data[0]

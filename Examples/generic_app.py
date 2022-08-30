@@ -39,6 +39,15 @@ class AppConfig:
     VectorGraphs: List[graphConfig] = None  # dict(graphs: [GraphStructure,..], factory: BaseFactory...)
 
 
+def click_callback(graph):
+    print(f"graph {graph} clicked\n")
+    graph.autoscale_trigger(not graph.autoscale_flag)
+    # for list_ in [self.line_graphs_list, self.level_graph_list, self.vector_graph_list]:
+    #     if list_:
+    #         for g in list_:
+    #             g.autoscale_trigger(not g.autoscale_flag)
+
+
 @dataclass
 class GENERICApp:
     refresh_rate: int
@@ -64,14 +73,6 @@ class GENERICApp:
     max_sample_request = 1
     paused_: bool = False
 
-    def click_callback(self, graph):
-        print(f"graph {graph} clicked\n")
-        graph.autoscale_trigger(not graph.autoscale_flag)
-        # for list_ in [self.line_graphs_list, self.level_graph_list, self.vector_graph_list]:
-        #     if list_:
-        #         for g in list_:
-        #             g.autoscale_trigger(not g.autoscale_flag)
-
     def create_from_config(self, config: AppConfig):
         # create_line graphs and their parsers
         if config.LineGraphs:
@@ -85,7 +86,7 @@ class GENERICApp:
                     factory = QTFactory()
                 struct = line_graph_config.structure
                 g = factory.get_LineGraph(struct, spawning_position=line_graph_config.spawning_position)
-                g.set_onclicked_callback(lambda event, graph_=g: self.click_callback(graph_))
+                g.set_onclicked_callback(lambda event, graph_=g: click_callback(graph_))
                 self.line_graphs_list.append(g)
                 self.line_graph_parsers.append(LineGraphParser(graph_structure=struct, factory_=factory,
                                                                Buffer_size_=line_graph_config.history,
@@ -101,7 +102,7 @@ class GENERICApp:
                     factory = QTFactory()
                 struct = lvl_graph_config.structure
                 g = factory.get_LevelGraph(struct, spawning_position=lvl_graph_config.spawning_position)
-                g.set_onclicked_callback(lambda event, graph_=g: self.click_callback(graph_))
+                g.set_onclicked_callback(lambda event, graph_=g: click_callback(graph_))
                 self.level_graph_list.append(g)
                 self.level_graph_parsers.append(
                     LevelGraphParser(graph_structure=struct, factory_=factory, x_axis_id=lvl_graph_config.x_axis_id,
@@ -117,7 +118,7 @@ class GENERICApp:
                     factory = MPLFactory()
                 struct = vector_graph_config.structure
                 g = factory.get_VectorGraph(struct, spawning_position=vector_graph_config.spawning_position)
-                g.set_onclicked_callback(lambda event, graph_=g: self.click_callback(graph_))
+                g.set_onclicked_callback(lambda event, graph_=g: click_callback(graph_))
                 self.vector_graph_list.append(g)
                 self.vector_graph_parsers.append(
                     VectorGraphParser(graph_structure=struct, factory_=factory, x_axis_id=vector_graph_config.x_axis_id,
@@ -216,13 +217,6 @@ class GENERICApp:
                     res = InitResponse(SamplingFrequency=list(float(f) for f in d[freq_begin:freq_end]),
                                        ChannelIDs=list(int(id_) for id_ in d[
                                                                            id_begin:]), )  # can be handy for more complicated applications
-                    # sample_size =
-                    # print("SZ: ", sample_size)
-                    # print("sliced SZ: ", round(sample_size / self.slice_size))
-                    # print("max_sample_request: ", self.max_sample_request)
-                    # if round(sample_size / self.slice_size) > self.max_sample_request:
-                    #     sample_size = self.max_sample_request
-                    # print(f"SAMPLE RATE: {sample_size}")
                     ratio = round(self.refresh_rate / 1000)
                     self.sample_size = max(ratio, ratio * round(min(res.SamplingFrequency)))
                     # self.sample_size = min(self.sample_size, self.max_sample_request)
@@ -253,6 +247,18 @@ class GENERICApp:
         b.setText("Stop")
         self.request_timer.start(self.refresh_rate)
         self.init_timer.start(10000)
+
+    def clear_callbacks(self, *args):
+        if self.line_graphs_list:
+            for g, p in zip(self.line_graphs_list, self.line_graph_parsers):
+                g.clearPlot()
+                p.clear_buffer(np.nan)
+        if self.level_graph_list:
+            for g in self.level_graph_list:
+                g.clearPlot()
+        if self.vector_graph_list:
+            for g in self.vector_graph_list:
+                g.clearPlot()
 
     def pausing_callback(self, *args):
         b = self.controlPanel.push_buttons.get("PAUSE")
@@ -330,10 +336,16 @@ class GENERICApp:
         self.controlPanel.add_push_button("Disconnect", (3, 0), callback=self.close_connection,
                                           UID="DISCONNECT")
         self.controlPanel.add_Icon("Connection", r"D:\HZDR\HZDR_VISU_TOOL\Examples\PegelApp\no_connection.png",
-                                   (0, 1, 2, 1), UID="CONNECTION_STATUS")
+                                   (0, 1, 1, 1), UID="CONNECTION_STATUS")
         self.controlPanel.add_push_button("Screenshot", (3, 1), self.take_screenshot, UID="SCREENSHOT")
+        self.controlPanel.add_push_button("Clear", (1, 1), self.clear_callbacks, UID="CLEAR")
         self.controlPanel.show()
 
+
+    def add_line_graphs_task(self, func):
+        if self.line_graphs_list:
+            for g in self.line_graphs_list:
+                g.add_postProcess(func)
 
 """                request = Request.parse_obj(json.loads(data))
                 sid = 0

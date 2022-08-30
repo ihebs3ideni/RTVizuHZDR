@@ -36,6 +36,11 @@ class LineGraphParser(RequestParser):
                 RB(size_max=Buffer_size_, default_value=np.nan), RB(size_max=Buffer_size_, default_value=np.nan))
         self.parsed_data = DS(Data=dummy_dict)
 
+    def clear_buffer(self, empty_value):
+        for id_, data_pair in self.parsed_data.Data.items():
+            data_pair[0].clear(empty_value)
+            data_pair[1].clear(empty_value)
+
     def __call__(self, request: Request, **kwargs):
         for sid, data_ in self.parsed_data.Data.items():
             if request.Body.data.channels.get(sid) is None:

@@ -57,6 +57,7 @@ def main():
     from PyQt5.QtWidgets import QApplication
     import sys
     # init global factory
+    global factory
     factory = MayaviFactory()
 
     qapp = QApplication(sys.argv)

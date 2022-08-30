@@ -192,12 +192,14 @@ class QTLevelGraph(QTBasedGraph):
             min_x, max_x = np.inf, np.NINF
             min_y, max_y = np.inf, np.NINF
             for id_, x in xs.items():
+
                 min_x = np.minimum(min_x, np.nanmin(x))
                 max_x = np.maximum(max_x, np.nanmax(x))
                 min_y = np.minimum(min_y, np.nanmin(ys[id_]))
                 max_y = np.maximum(max_y, np.nanmax(ys[id_]))
                 self.ScatterGroups[id_].setData(x, ys[id_])
                 if self.lines is not None:
+                    self.lines[id_].setVisible(self.ScatterGroups[id_].isVisible())
                     self.lines[id_].setData(x, ys[id_])
 
             if min_x != np.inf and max_x != np.NINF:
