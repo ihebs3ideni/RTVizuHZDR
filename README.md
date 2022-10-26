@@ -149,7 +149,7 @@ This class overwrites the Base interface in order to implement mayavi based grap
 
 
 ##UML
-![img](file:///D:\HZDR\HZDR_VISU_TOOL\UML_FrontEnd.png)
+![img](file:///UML_FrontEnd.png)
 
 
 
